@@ -1,69 +1,50 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from app.schemas.users import UserCreate, UserUpdate, UserResponse
+
+from app.database import get_db
+from app import crud
+# Імпортуємо модуль users як schemas, щоб працював твій response_model=schemas.UserResponse
+from app.schemas import users as schemas 
 
 router = APIRouter(
     prefix="/users",
     tags=["Users"]
 )
 
-# Тимчасова база даних у вигляді звичайного словника
-USERS_DB = {}
-current_id = 0
+# 1. POST — Створення юзера (з перевіркою емейлу через БД)
+@router.post("/", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(user_in: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    db_user = await crud.get_user_by_email(db, email=user_in.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return await crud.create_user(db=db, user=user_in)
 
-# POST — Створення юзера
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def create_user(user_in: UserCreate):
-    global current_id
-    
-    # Перевірка, чи емейл вже зайнятий
-    for user in USERS_DB.values():
-        if user["email"] == user_in.email:
-            raise HTTPException(status_code=400, detail="Email already registered")
-            
-    current_id += 1
-    new_user = {
-        "id": current_id,
-        "username": user_in.username,
-        "email": user_in.email,
-        "full_name": user_in.full_name,
-        "password": user_in.password
-    }
-    USERS_DB[current_id] = new_user
-    return new_user
+# 2. GET (All) — Отримання списку всіх юзерів з бази
+@router.get("/", response_model=List[schemas.UserResponse])
+async def get_users(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
+    return await crud.get_users(db, skip=skip, limit=limit)
 
-# GET (All) — Отримання списку всіх юзерів
-@router.get("/", response_model=List[UserResponse])
-async def get_users():
-    return list(USERS_DB.values())
-
-# GET (One) — Отримання юзера по id
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int):
-    if user_id not in USERS_DB:
+# 3. GET (One) — Отримання юзера по id
+@router.get("/{user_id}", response_model=schemas.UserResponse)
+async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    db_user = await crud.get_user(db, user_id=user_id)
+    if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return USERS_DB[user_id]
+    return db_user
 
-# PUT — Оновлення юзера
-@router.put("/{user_id}", response_model=UserResponse)
-async def update_user(user_id: int, user_in: UserUpdate):
-    if user_id not in USERS_DB:
+# 4. PUT — Оновлення юзера
+@router.put("/{user_id}", response_model=schemas.UserResponse)
+async def update_user(user_id: int, user_in: schemas.UserUpdate, db: AsyncSession = Depends(get_db)):
+    db_user = await crud.update_user(db=db, user_id=user_id, user_in=user_in)
+    if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    stored_user_data = USERS_DB[user_id]
-    # Метод model_dump(exclude_unset=True) бере тільки ті поля, які клієнт явно передав на оновлення
-    update_data = user_in.model_dump(exclude_unset=True)
-    
-    for key, value in update_data.items():
-        stored_user_data[key] = value
-        
-    USERS_DB[user_id] = stored_user_data
-    return stored_user_data
+    return db_user
 
-# DELETE — Видалення юзера
+# 5. DELETE — Видалення юзера
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user_id: int):
-    if user_id not in USERS_DB:
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
+    success = await crud.delete_user(db=db, user_id=user_id)
+    if not success:
         raise HTTPException(status_code=404, detail="User not found")
-    del USERS_DB[user_id]
     return None

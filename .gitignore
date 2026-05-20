@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 .vscode/
 .dockerignore
+
+local_vspa.db
+__pycache__/
+.vscode/
