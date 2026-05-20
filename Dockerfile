@@ -10,6 +10,7 @@ COPY pyproject.toml poetry.lock* /code/
 
 RUN poetry install --no-root --no-interaction --no-ansi
 
-COPY . /code/
+COPY ./app /code/app
 
-EXPOSE 8000
+# Запуск сервера через нову модульну точку входу з автоперезапуском
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
