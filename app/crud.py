@@ -24,18 +24,24 @@ async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100):
     )
     return result.scalars().all()
 
-# 3. Перевірка юзера за email
+# 3. Перевірка юзера за email (ВИПРАВЛЕНО: додано selectinload профілю)
 async def get_user_by_email(db: AsyncSession, email: str):
-    result = await db.execute(select(models.User).where(models.User.email == email))
+    result = await db.execute(
+        select(models.User)
+        .where(models.User.email == email)
+        .options(selectinload(models.User.profile))  # <-- Вилікувало MissingGreenlet для ручки /me
+    )
     return result.scalar_one_or_none()
 
-# 4. Створення юзера + автоматичне створення зв'язаного профілю
-async def create_user(db: AsyncSession, user: schemas.UserCreate):
+# 4. Створення юзера (Універсальне: підтримує звичайний пароль і захешований з 5 лаби)
+async def create_user(db: AsyncSession, user: schemas.UserCreate, hashed_password: str = None):
+    final_password = hashed_password if hashed_password else user.password
+
     # Створюємо самого користувача
     db_user = models.User(
         username=user.username,
         email=user.email,
-        password=user.password
+        password=final_password
     )
     db.add(db_user)
     await db.flush()  # Отримуємо id для db_user
@@ -43,15 +49,14 @@ async def create_user(db: AsyncSession, user: schemas.UserCreate):
     # Створюємо профіль
     db_profile = models.UserProfile(
         user_id=db_user.id,
-        full_name=user.full_name,
+        full_name=user.full_name if user.full_name else "string",
         bio=""
     )
     db.add(db_profile)
     
     await db.commit()  # Записуємо все в базу на диск
 
-    # СВЯТА ЗВ'ЯЗКА: Робимо чистий, свіжий асинхронний запит, 
-    # щоб дістати юзера разом із його профілем безпосередньо з диска
+    # СВЯТА ЗВ'ЯЗКА: Робимо чистий асинхронний запит, щоб віддати об'єкт без MissingGreenlet
     fresh_user_result = await db.execute(
         select(models.User)
         .where(models.User.id == db_user.id)
