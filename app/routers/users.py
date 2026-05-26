@@ -66,9 +66,7 @@ async def update_my_profile(
     return db_user
 
 
-# =================================================================
-# СТАНДАРТНІ КРУД РУЧКИ З 4 ЛАБИ
-# =================================================================
+
 
 # POST — Створення юзера (з перевіркою емейлу через БД)
 @router.post("/", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)

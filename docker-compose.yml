@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -10,10 +8,11 @@ services:
     # Монтуємо поточну папку з комп'ютера в папку /code всередині контейнера
     volumes:
       - .:/code
+    # Підключаємо твій файл .env, щоб Pydantic Settings побачив усі 6 потрібних змінних
+    env_file:
+      - .env
     depends_on:
       - db
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/fastapi_db
 
   db:
     image: postgres:15-alpine

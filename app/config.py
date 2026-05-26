@@ -1,27 +1,26 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
-    # Твої змінні для майбутнього
-    POSTGRES_USER: str = "user"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "dbname"
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+    POSTGRES_DB: str
 
-    # --- НАЛАШТУВАННЯ БЕЗПЕКИ ДЛЯ 5 ЛАБИ ---
-    SECRET_KEY: str = "SUPER_SECRET_KEY_CHANGEME_12345"  # Секретний ключ для підпису JWT
-    ALGORITHM: str = "HS256"                             # Алгоритм шифрування
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30                # Час життя токена (30 хвилин)
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # ДИНАМІЧНІ СИЛКИ (Жодного хардкоду!)
     @property
     def DATABASE_URL_ASYNC(self) -> str:
-        # Асинхронний локальний файл SQLite
-        return "sqlite+aiosqlite:///./local_vspa.db"
+        # Для FastAPI та Alembic Online модулю
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     @property
     def DATABASE_URL_SYNC(self) -> str:
-        # Для синхронних перевірок Alembic
-        return "sqlite:///./local_vspa.db"
+        # Для Alembic Offline модулю
+        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
